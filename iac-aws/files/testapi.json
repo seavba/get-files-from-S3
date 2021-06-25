@@ -1,0 +1,11 @@
+{
+  "user_images":[
+    {
+      "image": "images/image1.png"
+    },{
+      "image": "images/image2.png"
+    },{
+      "image": "images/image3.jpg"
+    }
+  ]
+}
