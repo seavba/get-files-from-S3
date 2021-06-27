@@ -15,8 +15,8 @@ locals {
 provider "aws" {
   region = "${var.aws_region}"
   profile = local.aws_profile
-  access_key = "AKIAREAFFMA723FFUNJA"
-  secret_key = "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"
+#  access_key = ""
+#  secret_key = ""
 }
 
 ###############################################################################
