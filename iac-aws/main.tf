@@ -15,6 +15,8 @@ locals {
 provider "aws" {
   region = "${var.aws_region}"
   profile = local.aws_profile
+  access_key = "AKIAREAFFMA723FFUNJA"
+  secret_key = "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"
 }
 
 ###############################################################################
@@ -22,7 +24,7 @@ provider "aws" {
 ###############################################################################
 
 resource "aws_s3_bucket" "lambda-bucket" {
-  bucket = "random-lambda-bucket-name"
+  bucket = "${var.bucket_name}"
 }
 
 resource "aws_s3_bucket_object" "folders" {
@@ -82,10 +84,10 @@ resource "aws_lambda_permission" "lambda_allow_bucket" {
 }
 
 resource "aws_lambda_function" "lambda_python" {
-  filename      = "./files/lambda_python.zip"
+  filename      = "./files/lambda_function.zip"
   function_name = "lambda_python"
   role          = aws_iam_role.lambda_role.arn
-  handler       = "lambda_function.lambda_handler"
+  handler       = "lambda_python.lambda_handler"
 
   runtime = "python3.7"
 
@@ -113,4 +115,88 @@ resource "aws_s3_bucket_notification" "bucket_notification" {
   }
 
   depends_on = [aws_lambda_permission.lambda_allow_bucket]
+}
+
+###############################################################################
+# API
+###############################################################################
+
+resource "aws_api_gateway_rest_api" "s3_api" {
+ name = "s3.uploader.com"
+}
+
+resource "aws_api_gateway_resource" "s3_api_folder_resource" {
+  rest_api_id = "${aws_api_gateway_rest_api.s3_api.id}"
+  parent_id   = "${aws_api_gateway_rest_api.s3_api.root_resource_id}"
+  path_part   = "{folder}"
+  depends_on = [aws_api_gateway_rest_api.s3_api]
+}
+
+resource "aws_api_gateway_resource" "s3_api_lists_resource" {
+  rest_api_id = "${aws_api_gateway_rest_api.s3_api.id}"
+  parent_id   = "${aws_api_gateway_resource.s3_api_folder_resource.id}"
+  path_part   = "lists"
+  depends_on = [aws_api_gateway_resource.s3_api_folder_resource]
+}
+
+resource "aws_api_gateway_resource" "s3_api_object_resource" {
+  rest_api_id = "${aws_api_gateway_rest_api.s3_api.id}"
+  parent_id   = "${aws_api_gateway_resource.s3_api_lists_resource.id}"
+  path_part   = "{object}"
+  depends_on = [aws_api_gateway_resource.s3_api_lists_resource]
+}
+
+resource "aws_api_gateway_method" "s3_api_method" {
+  rest_api_id   = "${aws_api_gateway_rest_api.s3_api.id}"
+  resource_id   = "${aws_api_gateway_resource.s3_api_object_resource.id}"
+  http_method   = "PUT"
+  authorization = "NONE"
+
+  request_parameters = {
+    "method.request.path.object" = true,
+    "method.request.path.folder" = true
+   }
+  depends_on = [aws_api_gateway_resource.s3_api_object_resource]
+}
+
+resource "aws_api_gateway_integration" "s3_api_method_integration" {
+  rest_api_id   = "${aws_api_gateway_rest_api.s3_api.id}"
+  resource_id   = "${aws_api_gateway_resource.s3_api_object_resource.id}"
+  http_method = "${aws_api_gateway_method.s3_api_method.http_method}"
+  type = "AWS"
+  uri = "arn:aws:apigateway:${var.aws_region}:s3:path/{bucket}/lists/{key}"
+  integration_http_method = "PUT"
+  credentials = "arn:aws:iam::077320249407:role/api-gateway-upload-to-s3"
+
+  request_parameters = {
+    "integration.request.path.bucket" = "method.request.path.folder",
+    "integration.request.path.key" = "method.request.path.object"
+  }
+  depends_on = [aws_api_gateway_method.s3_api_method]
+}
+
+resource "aws_api_gateway_method_response" "s3_api_response_200" {
+  rest_api_id = "${aws_api_gateway_rest_api.s3_api.id}"
+  resource_id = "${aws_api_gateway_resource.s3_api_object_resource.id}"
+  http_method = aws_api_gateway_method.s3_api_method.http_method
+  status_code = "200"
+  depends_on = [aws_api_gateway_integration.s3_api_method_integration]
+}
+
+resource "aws_api_gateway_integration_response" "s3_api_integration_response" {
+  rest_api_id = "${aws_api_gateway_rest_api.s3_api.id}"
+  resource_id = "${aws_api_gateway_resource.s3_api_object_resource.id}"
+  http_method = aws_api_gateway_method.s3_api_method.http_method
+  status_code = aws_api_gateway_method_response.s3_api_response_200.status_code
+  depends_on = [aws_api_gateway_method_response.s3_api_response_200]
+}
+
+resource "aws_api_gateway_deployment" "s3_api_deployment" {
+  rest_api_id = "${aws_api_gateway_rest_api.s3_api.id}"
+  stage_name = "v1"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+  depends_on = [aws_api_gateway_integration_response.s3_api_integration_response]
 }

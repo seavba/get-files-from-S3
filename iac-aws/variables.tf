@@ -20,15 +20,6 @@ variable "vpc_cdir" {
   default = "10.99.0.0/16"
 }
 
-#data "aws_subnet_ids" "vpc_subnet_ids" {
-#  vpc_id = aws_vpc.vpc_lambda.id
-#}
-
-#data "aws_subnet" "get_sub_ids" {
-#  count = "${length(data.aws_subnet_ids.vpc_subnet_ids.ids)}"
-#  id    = "${tolist(data.aws_subnet_ids.vpc_subnet_ids.ids)[count.index]}"
-#}
-
 ###############################################################################
 # EFS
 ###############################################################################
@@ -50,5 +41,13 @@ variable "permissions" {
 variable "iam_policy_arn" {
   description = "IAM Policy to be attached to role"
   type = list(string)
-  default = ["arn:aws:iam::aws:policy/AWSLambdaExecute", "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole","arn:aws:iam::aws:policy/AmazonElasticFileSystemClientFullAccess"]
+  default = ["arn:aws:iam::aws:policy/AWSLambdaExecute", "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole","arn:aws:iam::aws:policy/AmazonElasticFileSystemClientFullAccess","arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"]
+}
+
+###############################################################################
+# S3
+###############################################################################
+
+variable "bucket_name" {
+  default = "random-lambda-bucket-name"
 }

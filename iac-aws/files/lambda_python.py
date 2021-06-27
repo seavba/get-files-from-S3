@@ -45,12 +45,13 @@ def lambda_handler(event, context):
         s3.download_file(bucket,str(image['image']),temp_dir + '/' + filename)
         #Add images to the zip file
         zipObj.write(str(temp_dir + '/' + filename))
+        os.remove(str(temp_dir + '/' + filename))
     # close the Zip File
     zipObj.close()
     #Upload zip file to S3
     s3.upload_file(zip_file_name, bucket, 'zip/' + zip_file )
     #Generate URL
-    presigned_image_url = s3.generate_presigned_url('get_object', Params={'Bucket': bucket, 'Key': 'zip/' + zip_file}, ExpiresIn=5)
+    presigned_image_url = s3.generate_presigned_url('get_object', Params={'Bucket': bucket, 'Key': 'zip/' + zip_file}, ExpiresIn=120)
     #Print URL
     print(presigned_image_url)
     #Remove temp dir used during the lambda execution
